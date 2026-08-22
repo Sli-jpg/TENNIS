@@ -1,4 +1,4 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -241,9 +241,11 @@
             <label for="marketSelect">Market Focus</label>
             <select id="marketSelect">
                 <option value="ALL">All Markets</option>
-                <option value="u_2.5">Under 2.5 Sets</option>
                 <option value="1x2">Match Winner</option>
-                <option value="aah_+1.5">Asian Handicap +1.5</option>
+                <option value="u_2.5">Under 2.5 Sets</option>
+                <option value="aah_game_-1.5">Game AH -1.5</option>
+                <option value="aah_game_+1.5">Game AH +1.5</option>
+                <option value="aah_game">All Game AH Spreads</option>
             </select>
         </div>
         <div class="filter-group">
@@ -335,7 +337,7 @@
 
     let parsedData = [];
     let lastRenderedPicks = [];
-    let excludedMatchIds = new Set(); // User exclusions for custom builder
+    let excludedMatchIds = new Set();
 
     const fileInput = document.getElementById('csvFileInput');
     const fileName = document.getElementById('fileName');
@@ -540,9 +542,7 @@
             return;
         }
 
-        // Filter out user-excluded matches
         const filteredPicks = picks.filter(p => !excludedMatchIds.has(p.matchId));
-
         const uniqueMatchPicks = [];
         const seenMatches = new Set();
         const sorted = [...filteredPicks].sort((a,b) => b.edge - a.edge);
@@ -654,6 +654,13 @@
         URL.revokeObjectURL(url);
     }
 
+    function getVal(row, keys) {
+        for (const k of keys) {
+            if (row[k] !== undefined && row[k] !== '') return row[k];
+        }
+        return null;
+    }
+
     function render() {
         tbody.innerHTML = '';
         if (!parsedData || parsedData.length === 0) {
@@ -685,12 +692,18 @@
             const famous = isBigName(home, away);
             const matchId = `${normalizeName(home)}_${normalizeName(away)}`;
 
-            function processMarketPick(marketKey, prob, pickDesc, marketLabel, o1Key, o2Key, isHome) {
+            function processMarketPick(marketKey, prob, pickDesc, marketLabel, o1Val, o2Val, isHome) {
                 if (isNaN(prob) || prob < minProb) return;
-                if (market !== 'ALL' && market !== marketKey) return;
+                
+                // Market filter matching
+                if (market !== 'ALL') {
+                    if (market.startsWith('aah_game_') && marketKey !== market) return;
+                    if (market === 'aah_game' && !marketKey.startsWith('aah_game')) return;
+                    if (!market.startsWith('aah_game') && market !== marketKey) return;
+                }
 
-                const rawO1 = parseFloat(row[o1Key]);
-                const rawO2 = parseFloat(row[o2Key]);
+                const rawO1 = parseFloat(o1Val);
+                const rawO2 = parseFloat(o2Val);
 
                 let fairOdds = getFairOdds(rawO1, rawO2, isHome);
                 if (!fairOdds) {
@@ -725,11 +738,30 @@
                 });
             }
 
-            processMarketPick('1x2', parseFloat(row['1x2_h']), `${home} (Win)`, '1x2', 'odds_h', 'odds_a', true);
-            processMarketPick('1x2', parseFloat(row['1x2_a']), `${away} (Win)`, '1x2', 'odds_h', 'odds_a', false);
-            processMarketPick('u_2.5', parseFloat(row['u_2.5']), 'Under 2.5 Sets', 'u2.5', 'odds_u25', 'odds_o25', true);
-            processMarketPick('aah_+1.5', parseFloat(row['aah_+1.5_h']), `${home} +1.5 Sets`, 'AH +1.5', 'odds_h_ah', 'odds_a_ah', true);
-            processMarketPick('aah_+1.5', parseFloat(row['aah_+1.5_a']), `${away} +1.5 Sets`, 'AH +1.5', 'odds_h_ah', 'odds_a_ah', false);
+            // 1) Match Winner (1x2)
+            processMarketPick('1x2', parseFloat(getVal(row, ['1x2_h', 'prob_h'])), `${home} (Win)`, '1x2', getVal(row, ['odds_h', 'odds_1']), getVal(row, ['odds_a', 'odds_2']), true);
+            processMarketPick('1x2', parseFloat(getVal(row, ['1x2_a', 'prob_a'])), `${away} (Win)`, '1x2', getVal(row, ['odds_h', 'odds_1']), getVal(row, ['odds_a', 'odds_2']), false);
+
+            // 2) Under 2.5 Sets
+            processMarketPick('u_2.5', parseFloat(getVal(row, ['u_2.5', 'prob_u2.5'])), 'Under 2.5 Sets', 'u2.5', getVal(row, ['odds_u25', 'odds_u_2.5']), getVal(row, ['odds_o25', 'odds_o_2.5']), true);
+
+            // 3) Game Asian Handicaps (-1.5 Games & +1.5 Games)
+            const ahOddsH = getVal(row, ['odds_h_ah', 'odds_ah_h', 'odds_h_ah_game']);
+            const ahOddsA = getVal(row, ['odds_a_ah', 'odds_ah_a', 'odds_a_ah_game']);
+
+            // -1.5 Games
+            processMarketPick('aah_game_-1.5', parseFloat(getVal(row, ['aah_game_-1.5_h', 'aah_-1.5_h', 'prob_h_ah_-1.5'])), `${home} -1.5 Games`, 'Game AH -1.5', ahOddsH, ahOddsA, true);
+            processMarketPick('aah_game_-1.5', parseFloat(getVal(row, ['aah_game_-1.5_a', 'aah_-1.5_a', 'prob_a_ah_-1.5'])), `${away} -1.5 Games`, 'Game AH -1.5', ahOddsH, ahOddsA, false);
+
+            // +1.5 Games
+            processMarketPick('aah_game_+1.5', parseFloat(getVal(row, ['aah_game_+1.5_h', 'aah_+1.5_h', 'prob_h_ah_+1.5'])), `${home} +1.5 Games`, 'Game AH +1.5', ahOddsH, ahOddsA, true);
+            processMarketPick('aah_game_+1.5', parseFloat(getVal(row, ['aah_game_+1.5_a', 'aah_+1.5_a', 'prob_a_ah_+1.5'])), `${away} +1.5 Games`, 'Game AH +1.5', ahOddsH, ahOddsA, false);
+
+            // Generic Game AH Spread Line (if custom line like -2.5, +3.5 is present)
+            const genericLineH = getVal(row, ['handicap_h', 'ah_line_h', 'game_line_h']) || '';
+            const genericLineA = getVal(row, ['handicap_a', 'ah_line_a', 'game_line_a']) || '';
+            processMarketPick('aah_game', parseFloat(getVal(row, ['aah_game_h', 'prob_h_ah_game'])), `${home} ${genericLineH} Games`, 'Game AH', ahOddsH, ahOddsA, true);
+            processMarketPick('aah_game', parseFloat(getVal(row, ['aah_game_a', 'prob_a_ah_game'])), `${away} ${genericLineA} Games`, 'Game AH', ahOddsH, ahOddsA, false);
         });
 
         rawPicks.sort((a, b) => b.edge - a.edge);
@@ -787,7 +819,7 @@
         const file = e.target.files[0];
         if (!file) return;
         fileName.textContent = file.name;
-        excludedMatchIds.clear(); // Clear exclusions on new CSV load
+        excludedMatchIds.clear();
         const reader = new FileReader();
         reader.onload = function(ev) {
             parsedData = parseCSV(ev.target.result);
