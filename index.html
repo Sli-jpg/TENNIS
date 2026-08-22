@@ -1,0 +1,812 @@
+<!<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Tennis Quant Edge & Portfolio Engine</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --bg: #0b1120;
+            --card: #1a2332;
+            --accent: #10b981;
+            --text: #f1f5f9;
+            --sub: #94a3b8;
+            --border: #2d3a4f;
+            --badge: #0a4b3a;
+            --kelly: #facc15;
+            --parlay: #a855f7;
+            --danger: #ef4444;
+        }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container { max-width: 1250px; margin: 0 auto; }
+        header {
+            display: flex; flex-wrap: wrap; justify-content: space-between;
+            align-items: center; margin-bottom: 20px; gap: 10px;
+        }
+        h1 {
+            font-size: 1.8rem; margin: 0; letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #a7f3d0, #34d399);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .sub { color: var(--sub); margin: 4px 0 0 0; font-size: 0.85rem; }
+        .upload-area {
+            border: 2px dashed var(--border); background: var(--card);
+            border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 20px;
+        }
+        .file-label {
+            display: inline-block; background: var(--accent); color: #000;
+            font-weight: 700; padding: 10px 24px; border-radius: 40px; cursor: pointer;
+            border: none; font-size: 0.9rem;
+        }
+        input[type="file"] { display: none; }
+        #fileName { margin-left: 12px; color: var(--sub); font-size: 0.9rem; }
+
+        /* KPI Dashboard */
+        .kpi-bar {
+            display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px;
+        }
+        .kpi-card {
+            flex: 1; min-width: 190px; background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 16px 20px;
+        }
+        .kpi-label {
+            color: var(--sub); font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 0.05em; margin-bottom: 8px; font-weight: 600;
+        }
+        .kpi-value {
+            font-size: 1.6rem; font-weight: 700; font-family: monospace; color: var(--text);
+        }
+        .kpi-value.staked { color: #f472b6; }
+        .kpi-value.matches { color: #38bdf8; }
+        .kpi-value.profit { color: var(--accent); }
+        .kpi-value.avgedge { color: var(--kelly); }
+
+        .filters {
+            background: var(--card); border-radius: 16px; padding: 16px 20px;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+            margin-bottom: 20px; border: 1px solid var(--border);
+        }
+        .filter-group { display: flex; align-items: center; gap: 8px; }
+        .filter-group label { font-size: 0.8rem; font-weight: 600; color: var(--sub); }
+        .filter-group select, .filter-group input[type="number"] {
+            background: var(--bg); border: 1px solid var(--border);
+            color: var(--text); padding: 6px 12px; border-radius: 20px; font-size: 0.85rem;
+        }
+        .filter-group input[type="range"] {
+            accent-color: var(--kelly); width: 140px; cursor: pointer;
+        }
+        #portfolioRiskCapVal { color: var(--kelly); font-family: monospace; font-weight: 700; }
+
+        /* Accumulator Builder Section */
+        .builder-card {
+            background: var(--card); border: 1px solid var(--parlay);
+            border-radius: 16px; padding: 20px; margin-bottom: 25px;
+        }
+        .builder-controls {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px;
+        }
+        .btn-parlay {
+            background: var(--parlay); color: #fff; border: none; font-weight: 700;
+            padding: 8px 18px; border-radius: 20px; cursor: pointer; font-size: 0.85rem;
+            transition: opacity 0.2s;
+        }
+        .btn-parlay:hover { opacity: 0.9; }
+
+        .excluded-tray {
+            margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+            font-size: 0.8rem; color: var(--sub);
+        }
+        .excluded-tag {
+            background: #2a1b2e; border: 1px solid #7e22ce; color: #e9d5ff;
+            padding: 3px 10px; border-radius: 20px; display: inline-flex;
+            align-items: center; gap: 6px; font-size: 0.75rem;
+        }
+        .btn-restore {
+            background: transparent; border: none; color: #f472b6; cursor: pointer;
+            font-weight: bold; padding: 0; font-size: 0.85rem; line-height: 1;
+        }
+        .btn-remove-leg {
+            background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); color: #fca5a5;
+            border-radius: 50%; width: 22px; height: 22px; display: inline-flex;
+            align-items: center; justify-content: center; cursor: pointer; font-size: 0.75rem;
+            transition: background 0.15s; margin-left: 8px;
+        }
+        .btn-remove-leg:hover { background: rgba(239, 68, 68, 0.4); }
+
+        .parlay-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 25px;
+        }
+        .parlay-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .parlay-card.custom { border-color: var(--parlay); background: #131428; }
+        .parlay-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+            border-bottom: 1px solid var(--border); padding-bottom: 8px;
+        }
+        .parlay-title { font-weight: 700; color: #c084fc; font-size: 1rem; }
+        .parlay-odds { font-family: monospace; font-weight: 700; color: var(--kelly); font-size: 1.1rem; }
+        .parlay-leg {
+            font-size: 0.82rem; padding: 6px 0; border-bottom: 1px dashed #2d3a4f;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .parlay-leg:last-child { border-bottom: none; }
+        .parlay-footer {
+            margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--sub);
+        }
+        .section-header {
+            font-size: 1.2rem; font-weight: 700; margin: 25px 0 12px 0; color: #c084fc;
+        }
+
+        .actions-row {
+            display: flex; justify-content: flex-end; margin-bottom: 20px;
+        }
+        .export-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: transparent; color: #6ee7b7; font-weight: 700;
+            padding: 10px 22px; border-radius: 40px; cursor: pointer;
+            border: 1px solid var(--accent); font-size: 0.85rem;
+            transition: background 0.15s ease;
+        }
+        .export-btn:hover { background: rgba(16, 185, 129, 0.12); }
+        .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .export-btn:disabled:hover { background: transparent; }
+
+        .table-wrap {
+            background: var(--card); border-radius: 16px; overflow-x: auto; border: 1px solid var(--border);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 950px; }
+        th {
+            text-align: left; padding: 14px 12px; background: #0f1829; color: var(--sub);
+            font-size: 0.7rem; text-transform: uppercase; border-bottom: 1px solid var(--border);
+        }
+        td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:hover td { background: #1f2b3f; }
+        .badge {
+            background: var(--badge); color: #6ee7b7; padding: 4px 10px;
+            border-radius: 20px; font-weight: 600; font-size: 0.75rem;
+        }
+        .tag-challenger { background: #1e1b4b; color: #a5b4fc; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .tag-big { background: #451a1a; color: #fca5a5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .prob { font-weight: 700; color: #38bdf8; font-family: monospace; }
+        .edge { font-weight: 700; color: #facc15; font-family: monospace; }
+        .kelly-stake { color: #f472b6; font-weight: 700; font-family: monospace; }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--sub); }
+        .portfolio-cap { background: #1e293b; border-radius: 30px; padding: 6px 16px; font-size: 0.8rem; border: 1px solid #334155; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div>
+            <h1>🎾 Tennis Quant Edge Engine</h1>
+            <p class="sub">Dynamic Devig / Line-Adjusted Edge · Fractional Kelly · Accumulator Engine</p>
+        </div>
+        <div class="portfolio-cap">📊 Portfolio Risk Cap: <strong id="portfolioCapBadge">25% Bankroll</strong></div>
+    </header>
+
+    <div class="upload-area">
+        <label for="csvFileInput" class="file-label">📂 Upload Match Data (CSV)</label>
+        <input type="file" id="csvFileInput" accept=".csv">
+        <span id="fileName">No CSV file loaded</span>
+    </div>
+
+    <!-- KPI Dashboard -->
+    <div class="kpi-bar">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Picks Qualified</div>
+            <div class="kpi-value matches" id="kpiPicks">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total NPR Staked</div>
+            <div class="kpi-value staked" id="kpiStaked">रू 0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Expected Profit (NPR)</div>
+            <div class="kpi-value profit" id="kpiProfit">रू 0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Avg Edge %</div>
+            <div class="kpi-value avgedge" id="kpiAvgEdge">0.0%</div>
+        </div>
+    </div>
+
+    <div class="filters">
+        <div class="filter-group">
+            <label for="bankroll">Bankroll (NPR)</label>
+            <input type="number" id="bankroll" value="10000" step="1000" min="500">
+        </div>
+        <div class="filter-group">
+            <label for="minProb">Min Model Prob</label>
+            <input type="number" id="minProb" value="0.55" step="0.02" min="0.00" max="1.00">
+        </div>
+        <div class="filter-group">
+            <label for="minEdge">Min Edge</label>
+            <input type="number" id="minEdge" value="0.025" step="0.005" min="-0.50" max="0.50">
+        </div>
+        <div class="filter-group">
+            <label for="minOdds">Min Odds</label>
+            <input type="number" id="minOdds" value="1.40" step="0.05" min="1.01" max="20.00">
+        </div>
+        <div class="filter-group">
+            <label for="marketSelect">Market Focus</label>
+            <select id="marketSelect">
+                <option value="ALL">All Markets</option>
+                <option value="u_2.5">Under 2.5 Sets</option>
+                <option value="1x2">Match Winner</option>
+                <option value="aah_+1.5">Asian Handicap +1.5</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="kellyFraction">Kelly Fraction</label>
+            <select id="kellyFraction">
+                <option value="1">Full Kelly</option>
+                <option value="0.5">Half Kelly (0.5)</option>
+                <option value="0.25" selected>Quarter Kelly (0.25)</option>
+                <option value="0.125">Eighth Kelly (0.125)</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="portfolioRiskCap">Portfolio Risk Cap: <span id="portfolioRiskCapVal">25</span>%</label>
+            <input type="range" id="portfolioRiskCap" min="10" max="40" step="1" value="25">
+        </div>
+    </div>
+
+    <!-- Custom Target Odds Accumulator Builder -->
+    <div class="builder-card">
+        <div class="section-header" style="margin-top:0;">🎯 Interactive Custom Accumulator Builder</div>
+        <div class="builder-controls">
+            <div class="filter-group">
+                <label for="targetOddsInput">Desired Target Odds:</label>
+                <input type="number" id="targetOddsInput" value="5.00" step="0.5" min="1.5" max="100.0">
+            </div>
+            <div class="filter-group">
+                <label for="legCountInput">Exact Leg Count:</label>
+                <select id="legCountInput">
+                    <option value="AUTO">Auto (Match Target Odds)</option>
+                    <option value="2">2 Legs</option>
+                    <option value="3" selected>3 Legs</option>
+                    <option value="4">4 Legs</option>
+                    <option value="5">5 Legs</option>
+                </select>
+            </div>
+            <button class="btn-parlay" id="btnBuildCustom">⚡ Rebuild Custom Parlay</button>
+        </div>
+
+        <div id="excludedTray" class="excluded-tray" style="display:none;">
+            <span>🚫 Excluded Matches:</span>
+            <div id="excludedList" style="display:inline-flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+
+        <div id="customParlayOutput" style="margin-top:14px;">
+            <div class="empty-state" style="padding:10px;">Upload CSV data to generate and customize your target accumulator.</div>
+        </div>
+    </div>
+
+    <!-- Auto-Generated Accumulators -->
+    <div class="section-header">🎰 Quant Recommended Accumulators</div>
+    <div class="parlay-grid" id="parlayGrid">
+        <div class="empty-state" style="grid-column: 1/-1;">📥 Upload CSV data to automatically generate 2-leg, 3-leg, and 4-leg accumulators.</div>
+    </div>
+
+    <div class="actions-row">
+        <button class="export-btn" id="exportBtn" disabled>⬇️ Export Picks CSV</button>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>League</th>
+                    <th>Match</th>
+                    <th>Pick</th>
+                    <th>Market</th>
+                    <th>Model Prob</th>
+                    <th>Fair Odds</th>
+                    <th>Calculated Edge</th>
+                    <th>Kelly Stake</th>
+                    <th>Bet Amount</th>
+                    <th>Tier</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="10" class="empty-state">📥 Upload CSV to view quantitative recommendations.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const BIG_NAMES = [
+        "gauff", "swiatek", "pegula", "tiafoe", "musetti", "fritz",
+        "hurkacz", "safiullin", "kostyuk", "bolelli", "vavassori", "noskova", "bouzkova",
+        "alcaraz", "djokovic", "nadal", "medvedev", "zverev", "rublev", "tsitsipas",
+        "ruud", "auger", "berrettini", "kyrgios", "shapovalov", "sinner", "rune"
+    ];
+
+    let parsedData = [];
+    let lastRenderedPicks = [];
+    let excludedMatchIds = new Set(); // User exclusions for custom builder
+
+    const fileInput = document.getElementById('csvFileInput');
+    const fileName = document.getElementById('fileName');
+    const bankrollInput = document.getElementById('bankroll');
+    const minProbInput = document.getElementById('minProb');
+    const minEdgeInput = document.getElementById('minEdge');
+    const minOddsInput = document.getElementById('minOdds');
+    const marketSelect = document.getElementById('marketSelect');
+    const kellyFractionInput = document.getElementById('kellyFraction');
+    const portfolioRiskCapInput = document.getElementById('portfolioRiskCap');
+    const portfolioRiskCapVal = document.getElementById('portfolioRiskCapVal');
+    const portfolioCapBadge = document.getElementById('portfolioCapBadge');
+    const exportBtn = document.getElementById('exportBtn');
+    const tbody = document.getElementById('tableBody');
+
+    const targetOddsInput = document.getElementById('targetOddsInput');
+    const legCountInput = document.getElementById('legCountInput');
+    const btnBuildCustom = document.getElementById('btnBuildCustom');
+    const customParlayOutput = document.getElementById('customParlayOutput');
+    const excludedTray = document.getElementById('excludedTray');
+    const excludedList = document.getElementById('excludedList');
+    const parlayGrid = document.getElementById('parlayGrid');
+
+    const kpiPicks = document.getElementById('kpiPicks');
+    const kpiStaked = document.getElementById('kpiStaked');
+    const kpiProfit = document.getElementById('kpiProfit');
+    const kpiAvgEdge = document.getElementById('kpiAvgEdge');
+
+    function isBigName(home, away) {
+        const text = (home + ' ' + away).toLowerCase();
+        return BIG_NAMES.some(name => text.includes(name));
+    }
+
+    function normalizeName(str) {
+        return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function parseCSV(text) {
+        const lines = text.trim().split('\n');
+        if (lines.length < 2) return [];
+        const headers = lines[0].split(',').map(h => h.trim());
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+            if (cols.length < headers.length) continue;
+            const obj = {};
+            headers.forEach((h, idx) => { obj[h] = cols[idx] || ''; });
+            rows.push(obj);
+        }
+        return rows;
+    }
+
+    function getFairOdds(rawO1, rawO2, isHome) {
+        if (!isNaN(rawO1) && !isNaN(rawO2) && rawO1 > 1 && rawO2 > 1) {
+            const sumImplied = (1 / rawO1) + (1 / rawO2);
+            const pFair = (1 / (isHome ? rawO1 : rawO2)) / sumImplied;
+            return 1 / pFair;
+        }
+        return null;
+    }
+
+    function calculateQuarterKelly(pModel, fairOdds, kellyFraction = 0.25) {
+        const b = fairOdds - 1.0;
+        if (b <= 0) return 0;
+        const q = 1.0 - pModel;
+        const fullKelly = (pModel * b - q) / b;
+        return Math.max(fullKelly * kellyFraction, 0);
+    }
+
+    function applyPortfolioCap(stakesArray, capFraction = 0.25) {
+        const totalStake = stakesArray.reduce((acc, curr) => acc + curr, 0);
+        if (totalStake <= capFraction || totalStake === 0) return stakesArray;
+        const scaleFactor = capFraction / totalStake;
+        return stakesArray.map(stake => stake * scaleFactor);
+    }
+
+    function updateKPIs(rawPicks, bankroll) {
+        if (rawPicks.length === 0) {
+            kpiPicks.textContent = '0';
+            kpiStaked.textContent = 'रू 0';
+            kpiProfit.textContent = 'रू 0';
+            kpiAvgEdge.textContent = '0.0%';
+            return;
+        }
+
+        kpiPicks.textContent = rawPicks.length.toLocaleString('en-IN');
+        const totalStaked = rawPicks.reduce((acc, p) => acc + Math.round(p.kellyFrac * bankroll), 0);
+        kpiStaked.textContent = 'रू ' + totalStaked.toLocaleString('en-IN');
+        const totalProfit = rawPicks.reduce((acc, p) => acc + (p.kellyFrac * bankroll * p.evPerUnit), 0);
+        kpiProfit.textContent = 'रू ' + Math.round(totalProfit).toLocaleString('en-IN');
+        const avgEdge = rawPicks.reduce((acc, p) => acc + p.edge, 0) / rawPicks.length;
+        kpiAvgEdge.textContent = (avgEdge * 100).toFixed(1) + '%';
+    }
+
+    function generateAccumulators(picks) {
+        parlayGrid.innerHTML = '';
+        if (picks.length < 2) {
+            parlayGrid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">⚠️ At least 2 non-overlapping matches required to form accumulators.</div>';
+            return;
+        }
+
+        const sorted = [...picks].sort((a, b) => b.evPerUnit - a.evPerUnit);
+        const bankroll = parseFloat(bankrollInput.value) || 10000;
+        const kellyFracVal = parseFloat(kellyFractionInput.value) || 0.25;
+        const sizes = [2, 3, 4];
+
+        const usedMatchIdsAcrossAccs = new Set();
+
+        sizes.forEach(size => {
+            const availablePicks = [];
+            const localSeenMatches = new Set();
+
+            for (const p of sorted) {
+                if (!usedMatchIdsAcrossAccs.has(p.matchId) && !localSeenMatches.has(p.matchId)) {
+                    localSeenMatches.add(p.matchId);
+                    availablePicks.push(p);
+                }
+            }
+
+            if (availablePicks.length < size) return;
+
+            const legPicks = availablePicks.slice(0, size);
+            legPicks.forEach(l => usedMatchIdsAcrossAccs.add(l.matchId));
+
+            const combOdds = legPicks.reduce((acc, item) => acc * item.fairOdds, 1);
+            const combProb = legPicks.reduce((acc, item) => acc * item.prob, 1);
+            const kellyFrac = calculateQuarterKelly(combProb, combOdds, kellyFracVal);
+            const betNpr = Math.round(kellyFrac * bankroll);
+
+            let legsHTML = legPicks.map(l => `
+                <div class="parlay-leg">
+                    <span><strong>${l.home} vs ${l.away}</strong> (${l.pick})</span>
+                    <span class="edge">@${l.fairOdds.toFixed(2)}</span>
+                </div>
+            `).join('');
+
+            const card = document.createElement('div');
+            card.className = 'parlay-card';
+            card.innerHTML = `
+                <div>
+                    <div class="parlay-header">
+                        <span class="parlay-title">🔥 Best ${size}-Leg Accumulator</span>
+                        <span class="parlay-odds">@${combOdds.toFixed(2)}</span>
+                    </div>
+                    ${legsHTML}
+                </div>
+                <div class="parlay-footer">
+                    <span>Hit Prob: <strong>${(combProb * 100).toFixed(1)}%</strong></span>
+                    <span>Rec. Stake: <strong class="kelly-stake">रू ${betNpr.toLocaleString('en-IN')}</strong></span>
+                </div>
+            `;
+            parlayGrid.appendChild(card);
+        });
+
+        if (parlayGrid.children.length === 0) {
+            parlayGrid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;">⚠️ Not enough unique matches available to create distinct accumulators without repeating picks.</div>';
+        }
+    }
+
+    function renderExcludedTray() {
+        if (excludedMatchIds.size === 0) {
+            excludedTray.style.display = 'none';
+            return;
+        }
+        excludedTray.style.display = 'flex';
+        excludedList.innerHTML = '';
+        
+        excludedMatchIds.forEach(id => {
+            const matchObj = lastRenderedPicks.find(p => p.matchId === id);
+            const name = matchObj ? `${matchObj.home} vs ${matchObj.away}` : id;
+            const tag = document.createElement('div');
+            tag.className = 'excluded-tag';
+            tag.innerHTML = `<span>${name}</span> <button class="btn-restore" onclick="restoreMatch('${id}')">＋</button>`;
+            excludedList.appendChild(tag);
+        });
+    }
+
+    window.excludeMatch = function(matchId) {
+        excludedMatchIds.add(matchId);
+        renderExcludedTray();
+        buildCustomParlay(lastRenderedPicks);
+    };
+
+    window.restoreMatch = function(matchId) {
+        excludedMatchIds.delete(matchId);
+        renderExcludedTray();
+        buildCustomParlay(lastRenderedPicks);
+    };
+
+    function buildCustomParlay(picks) {
+        renderExcludedTray();
+        if (!picks || picks.length === 0) {
+            customParlayOutput.innerHTML = '<div class="empty-state">No picks available. Upload CSV data.</div>';
+            return;
+        }
+
+        const targetOdds = parseFloat(targetOddsInput.value);
+        const legMode = legCountInput.value;
+
+        if (isNaN(targetOdds) || targetOdds <= 1) {
+            customParlayOutput.innerHTML = '<div class="empty-state" style="color:#ef4444;">Please enter target odds greater than 1.00.</div>';
+            return;
+        }
+
+        // Filter out user-excluded matches
+        const filteredPicks = picks.filter(p => !excludedMatchIds.has(p.matchId));
+
+        const uniqueMatchPicks = [];
+        const seenMatches = new Set();
+        const sorted = [...filteredPicks].sort((a,b) => b.edge - a.edge);
+
+        for (const p of sorted) {
+            if (!seenMatches.has(p.matchId)) {
+                seenMatches.add(p.matchId);
+                uniqueMatchPicks.push(p);
+            }
+        }
+
+        const selectedLegs = [];
+        let currentOdds = 1.0;
+
+        if (legMode === 'AUTO') {
+            for (const pick of uniqueMatchPicks) {
+                if (currentOdds >= targetOdds) break;
+                selectedLegs.push(pick);
+                currentOdds *= pick.fairOdds;
+            }
+        } else {
+            const targetLegCount = parseInt(legMode, 10);
+            if (uniqueMatchPicks.length < targetLegCount) {
+                customParlayOutput.innerHTML = `<div class="empty-state" style="color:#ef4444;">Not enough available unique matches (${uniqueMatchPicks.length}) to form a ${targetLegCount}-leg parlay. Restore excluded matches or adjust filters.</div>`;
+                return;
+            }
+            for (let i = 0; i < targetLegCount; i++) {
+                selectedLegs.push(uniqueMatchPicks[i]);
+                currentOdds *= uniqueMatchPicks[i].fairOdds;
+            }
+        }
+
+        if (selectedLegs.length === 0) {
+            customParlayOutput.innerHTML = '<div class="empty-state">No picks match criteria. Try restoring excluded matches.</div>';
+            return;
+        }
+
+        const bankroll = parseFloat(bankrollInput.value) || 10000;
+        const combProb = selectedLegs.reduce((acc, item) => acc * item.prob, 1);
+        const kellyFrac = calculateQuarterKelly(combProb, currentOdds, parseFloat(kellyFractionInput.value) || 0.25);
+        const betNpr = Math.round(kellyFrac * bankroll);
+
+        let legsHTML = selectedLegs.map(l => `
+            <div class="parlay-leg">
+                <span>
+                    <strong>${l.home} vs ${l.away}</strong> — ${l.pick}
+                </span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="edge">@${l.fairOdds.toFixed(2)}</span>
+                    <button class="btn-remove-leg" onclick="excludeMatch('${l.matchId}')" title="Exclude match & recalculate">✕</button>
+                </div>
+            </div>
+        `).join('');
+
+        customParlayOutput.innerHTML = `
+            <div class="parlay-card custom">
+                <div class="parlay-header">
+                    <span class="parlay-title">🎯 Custom Parlay (${selectedLegs.length} Legs)</span>
+                    <span class="parlay-odds">Total Odds: @${currentOdds.toFixed(2)}</span>
+                </div>
+                <div>${legsHTML}</div>
+                <div class="parlay-footer">
+                    <span>Hit Prob: <strong>${(combProb * 100).toFixed(1)}%</strong></span>
+                    <span>Target: <strong>@${targetOdds.toFixed(2)}</strong></span>
+                    <span>Rec Stake: <strong class="kelly-stake">रू ${betNpr.toLocaleString('en-IN')}</strong></span>
+                </div>
+            </div>
+        `;
+    }
+
+    function exportPicksCSV() {
+        if (!lastRenderedPicks || lastRenderedPicks.length === 0) return;
+
+        const headers = ['League', 'Home', 'Away', 'Pick', 'Market', 'Model Prob', 'Fair Odds', 'Quoted Odds', 'Edge %', 'Kelly Stake %', 'Bet Amount (NPR)', 'Expected Profit (NPR)', 'Tier'];
+        const bankroll = parseFloat(bankrollInput.value) || 10000;
+
+        const rows = lastRenderedPicks.map(p => [
+            p.league,
+            p.home,
+            p.away,
+            p.pick,
+            p.market,
+            (p.prob * 100).toFixed(1),
+            p.fairOdds.toFixed(2),
+            p.quotedOdds.toFixed(2),
+            (p.edge * 100).toFixed(1),
+            (p.kellyFrac * 100).toFixed(2),
+            Math.round(p.kellyFrac * bankroll),
+            Math.round(p.kellyFrac * bankroll * p.evPerUnit),
+            p.famous ? 'Big Name' : 'Challenger'
+        ]);
+
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(field => {
+                const str = String(field);
+                return str.includes(',') ? `"${str}"` : str;
+            }).join(','))
+            .join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `tennis_quant_picks_${timestamp}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function render() {
+        tbody.innerHTML = '';
+        if (!parsedData || parsedData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="empty-state">📂 No data loaded. Upload a CSV file.</td></tr>`;
+            lastRenderedPicks = [];
+            updateKPIs([], parseFloat(bankrollInput.value) || 10000);
+            exportBtn.disabled = true;
+            return;
+        }
+
+        const bankroll = parseFloat(bankrollInput.value) || 10000;
+        const minProb = parseFloat(minProbInput.value) ?? 0.55;
+        const minEdge = parseFloat(minEdgeInput.value) ?? 0.025;
+        const minOdds = parseFloat(minOddsInput.value) || 1.40;
+        const market = marketSelect.value;
+        const kellyFraction = parseFloat(kellyFractionInput.value) || 0.25;
+        const riskCapPercent = parseFloat(portfolioRiskCapInput.value) || 25;
+        const riskCapFraction = riskCapPercent / 100;
+
+        portfolioRiskCapVal.textContent = riskCapPercent;
+        portfolioCapBadge.textContent = riskCapPercent + '% Bankroll';
+
+        const rawPicks = [];
+
+        parsedData.forEach(row => {
+            const home = row['home'] || 'Home';
+            const away = row['away'] || 'Away';
+            const league = row['league'] || 'Tennis';
+            const famous = isBigName(home, away);
+            const matchId = `${normalizeName(home)}_${normalizeName(away)}`;
+
+            function processMarketPick(marketKey, prob, pickDesc, marketLabel, o1Key, o2Key, isHome) {
+                if (isNaN(prob) || prob < minProb) return;
+                if (market !== 'ALL' && market !== marketKey) return;
+
+                const rawO1 = parseFloat(row[o1Key]);
+                const rawO2 = parseFloat(row[o2Key]);
+
+                let fairOdds = getFairOdds(rawO1, rawO2, isHome);
+                if (!fairOdds) {
+                    fairOdds = 1 / (prob * 0.96); 
+                }
+
+                const rawQuoted = isHome ? rawO1 : rawO2;
+                const quotedOdds = (!isNaN(rawQuoted) && rawQuoted > 1) ? rawQuoted : fairOdds;
+                if (quotedOdds < minOdds) return;
+
+                const impliedFairProb = 1 / fairOdds;
+                const edge = prob - impliedFairProb;
+
+                if (edge < minEdge) return;
+
+                const kellyFrac = calculateQuarterKelly(prob, fairOdds, kellyFraction);
+                const b = fairOdds - 1.0;
+                const evPerUnit = b > 0 ? (prob * b - (1 - prob)) : 0;
+
+                rawPicks.push({
+                    league, home, away, matchId,
+                    pick: pickDesc,
+                    market: marketLabel,
+                    marketKey,
+                    prob,
+                    fairOdds,
+                    quotedOdds,
+                    edge,
+                    kellyFrac,
+                    evPerUnit,
+                    famous
+                });
+            }
+
+            processMarketPick('1x2', parseFloat(row['1x2_h']), `${home} (Win)`, '1x2', 'odds_h', 'odds_a', true);
+            processMarketPick('1x2', parseFloat(row['1x2_a']), `${away} (Win)`, '1x2', 'odds_h', 'odds_a', false);
+            processMarketPick('u_2.5', parseFloat(row['u_2.5']), 'Under 2.5 Sets', 'u2.5', 'odds_u25', 'odds_o25', true);
+            processMarketPick('aah_+1.5', parseFloat(row['aah_+1.5_h']), `${home} +1.5 Sets`, 'AH +1.5', 'odds_h_ah', 'odds_a_ah', true);
+            processMarketPick('aah_+1.5', parseFloat(row['aah_+1.5_a']), `${away} +1.5 Sets`, 'AH +1.5', 'odds_h_ah', 'odds_a_ah', false);
+        });
+
+        rawPicks.sort((a, b) => b.edge - a.edge);
+
+        const initialStakes = rawPicks.map(p => p.kellyFrac);
+        const cappedStakes = applyPortfolioCap(initialStakes, riskCapFraction);
+        rawPicks.forEach((p, i) => { p.kellyFrac = cappedStakes[i]; });
+
+        if (rawPicks.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" class="empty-state">🔍 No picks match current filters. Try lowering Min Edge, Min Model Prob, or Min Odds.</td></tr>`;
+            lastRenderedPicks = [];
+            updateKPIs([], bankroll);
+            generateAccumulators([]);
+            buildCustomParlay([]);
+            exportBtn.disabled = true;
+            return;
+        }
+
+        rawPicks.forEach(p => {
+            const tr = document.createElement('tr');
+            const tierHTML = p.famous 
+                ? '<span class="tag-big">★ Big Name</span>' 
+                : '<span class="tag-challenger">⚡ Challenger</span>';
+
+            const stakeDisplay = (p.kellyFrac * 100).toFixed(2) + '%';
+            const nprAmount = 'रू ' + Math.round(p.kellyFrac * bankroll).toLocaleString('en-IN');
+
+            tr.innerHTML = `
+                <td>${p.league}</td>
+                <td><strong>${p.home}</strong> vs <strong>${p.away}</strong></td>
+                <td><span class="badge">${p.pick}</span></td>
+                <td>${p.market}</td>
+                <td><span class="prob">${(p.prob * 100).toFixed(1)}%</span></td>
+                <td><span class="edge">${p.fairOdds.toFixed(2)}</span></td>
+                <td><span class="edge">${(p.edge * 100).toFixed(1)}%</span></td>
+                <td><span class="kelly-stake">${stakeDisplay}</span></td>
+                <td><strong>${nprAmount}</strong></td>
+                <td>${tierHTML}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        lastRenderedPicks = rawPicks;
+        updateKPIs(rawPicks, bankroll);
+        generateAccumulators(rawPicks);
+        buildCustomParlay(rawPicks);
+        exportBtn.disabled = false;
+    }
+
+    btnBuildCustom.addEventListener('click', () => buildCustomParlay(lastRenderedPicks));
+    targetOddsInput.addEventListener('input', () => buildCustomParlay(lastRenderedPicks));
+    legCountInput.addEventListener('change', () => buildCustomParlay(lastRenderedPicks));
+
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        fileName.textContent = file.name;
+        excludedMatchIds.clear(); // Clear exclusions on new CSV load
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            parsedData = parseCSV(ev.target.result);
+            render();
+        };
+        reader.readAsText(file);
+    });
+
+    bankrollInput.addEventListener('input', render);
+    minProbInput.addEventListener('input', render);
+    minEdgeInput.addEventListener('input', render);
+    minOddsInput.addEventListener('input', render);
+    marketSelect.addEventListener('change', render);
+    kellyFractionInput.addEventListener('change', render);
+    portfolioRiskCapInput.addEventListener('input', render);
+    exportBtn.addEventListener('click', exportPicksCSV);
+
+    portfolioRiskCapVal.textContent = portfolioRiskCapInput.value;
+    portfolioCapBadge.textContent = portfolioRiskCapInput.value + '% Bankroll';
+</script>
+</body>
+</html>
