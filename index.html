@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚡ Tennis Quant Edge & Portfolio Engine</title>
+    <!-- SheetJS CDN for parsing Excel (.xlsx/.xls) files -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         :root {
@@ -195,9 +197,9 @@
     </header>
 
     <div class="upload-area">
-        <label for="csvFileInput" class="file-label">📂 Upload Match Data (CSV)</label>
-        <input type="file" id="csvFileInput" accept=".csv">
-        <span id="fileName">No CSV file loaded</span>
+        <label for="excelFileInput" class="file-label">📂 Upload Match Data (.xlsx)</label>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls">
+        <span id="fileName">No Excel file loaded</span>
     </div>
 
     <!-- KPI Dashboard -->
@@ -290,14 +292,14 @@
         </div>
 
         <div id="customParlayOutput" style="margin-top:14px;">
-            <div class="empty-state" style="padding:10px;">Upload CSV data to generate and customize your target accumulator.</div>
+            <div class="empty-state" style="padding:10px;">Upload Excel data to generate and customize your target accumulator.</div>
         </div>
     </div>
 
     <!-- Auto-Generated Accumulators -->
     <div class="section-header">🎰 Quant Recommended Accumulators</div>
     <div class="parlay-grid" id="parlayGrid">
-        <div class="empty-state" style="grid-column: 1/-1;">📥 Upload CSV data to automatically generate 2-leg, 3-leg, and 4-leg accumulators.</div>
+        <div class="empty-state" style="grid-column: 1/-1;">📥 Upload Excel data to automatically generate 2-leg, 3-leg, and 4-leg accumulators.</div>
     </div>
 
     <div class="actions-row">
@@ -321,7 +323,7 @@
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <tr><td colspan="10" class="empty-state">📥 Upload CSV to view quantitative recommendations.</td></tr>
+                <tr><td colspan="10" class="empty-state">📥 Upload Excel file to view quantitative recommendations.</td></tr>
             </tbody>
         </table>
     </div>
@@ -339,7 +341,7 @@
     let lastRenderedPicks = [];
     let excludedMatchIds = new Set();
 
-    const fileInput = document.getElementById('csvFileInput');
+    const fileInput = document.getElementById('excelFileInput');
     const fileName = document.getElementById('fileName');
     const bankrollInput = document.getElementById('bankroll');
     const minProbInput = document.getElementById('minProb');
@@ -373,21 +375,6 @@
 
     function normalizeName(str) {
         return (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-
-    function parseCSV(text) {
-        const lines = text.trim().split('\n');
-        if (lines.length < 2) return [];
-        const headers = lines[0].split(',').map(h => h.trim());
-        const rows = [];
-        for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-            if (cols.length < headers.length) continue;
-            const obj = {};
-            headers.forEach((h, idx) => { obj[h] = cols[idx] || ''; });
-            rows.push(obj);
-        }
-        return rows;
     }
 
     function getFairOdds(rawO1, rawO2, isHome) {
@@ -530,7 +517,7 @@
     function buildCustomParlay(picks) {
         renderExcludedTray();
         if (!picks || picks.length === 0) {
-            customParlayOutput.innerHTML = '<div class="empty-state">No picks available. Upload CSV data.</div>';
+            customParlayOutput.innerHTML = '<div class="empty-state">No picks available. Upload Excel data.</div>';
             return;
         }
 
@@ -664,7 +651,7 @@
     function render() {
         tbody.innerHTML = '';
         if (!parsedData || parsedData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="10" class="empty-state">📂 No data loaded. Upload a CSV file.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="empty-state">📂 No data loaded. Upload an Excel file.</td></tr>`;
             lastRenderedPicks = [];
             updateKPIs([], parseFloat(bankrollInput.value) || 10000);
             exportBtn.disabled = true;
@@ -820,12 +807,21 @@
         if (!file) return;
         fileName.textContent = file.name;
         excludedMatchIds.clear();
+
         const reader = new FileReader();
         reader.onload = function(ev) {
-            parsedData = parseCSV(ev.target.result);
+            const data = new Uint8Array(ev.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // Get first sheet
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Parse to JSON array of objects
+            parsedData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
             render();
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     });
 
     bankrollInput.addEventListener('input', render);
