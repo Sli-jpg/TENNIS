@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>⚡ Tennis Quant Edge & Portfolio Engine</title>
+    <!-- Puter.js Library for Free Browser AI -->
+    <script src="https://js.puter.com/v2/"></script>
     <style>
         * { box-sizing: border-box; }
         :root {
@@ -17,6 +19,7 @@
             --kelly: #facc15;
             --parlay: #a855f7;
             --danger: #ef4444;
+            --ai-accent: #3b82f6;
         }
         body {
             background: var(--bg);
@@ -83,6 +86,24 @@
             accent-color: var(--kelly); width: 140px; cursor: pointer;
         }
         #portfolioRiskCapVal { color: var(--kelly); font-family: monospace; font-weight: 700; }
+
+        /* AI Debater Card */
+        .ai-card {
+            background: #0f172a; border: 1px solid var(--ai-accent);
+            border-radius: 16px; padding: 20px; margin-bottom: 25px;
+        }
+        .ai-btn {
+            background: var(--ai-accent); color: #fff; border: none; font-weight: 700;
+            padding: 10px 20px; border-radius: 30px; cursor: pointer; font-size: 0.85rem;
+            transition: opacity 0.2s;
+        }
+        .ai-btn:hover { opacity: 0.9; }
+        .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-output {
+            margin-top: 15px; background: #1e293b; border-radius: 12px;
+            padding: 15px; border: 1px solid #334155; font-size: 0.9rem;
+            line-height: 1.5; color: #cbd5e1; white-space: pre-wrap;
+        }
 
         /* Accumulator Builder Section */
         .builder-card {
@@ -264,6 +285,14 @@
         </div>
     </div>
 
+    <!-- Smart AI Debater Section -->
+    <div class="ai-card">
+        <div class="section-header" style="margin-top:0; color:#60a5fa;">🤖 Smart AI Pick Debater</div>
+        <p style="font-size:0.85rem; color: var(--sub); margin-bottom: 12px;">Let AI analyze all current qualified picks, weigh their expected value vs edge vs odds, and select the single best match to stake on.</p>
+        <button class="ai-btn" id="runAiBtn">🧠 Debate Picks & Pick Best Bet</button>
+        <div id="aiOutput" class="ai-output" style="display:none;"></div>
+    </div>
+
     <!-- Custom Target Odds Accumulator Builder -->
     <div class="builder-card">
         <div class="section-header" style="margin-top:0;">🎯 Interactive Custom Accumulator Builder</div>
@@ -362,10 +391,50 @@
     const excludedList = document.getElementById('excludedList');
     const parlayGrid = document.getElementById('parlayGrid');
 
+    const runAiBtn = document.getElementById('runAiBtn');
+    const aiOutput = document.getElementById('aiOutput');
+
     const kpiPicks = document.getElementById('kpiPicks');
     const kpiStaked = document.getElementById('kpiStaked');
     const kpiProfit = document.getElementById('kpiProfit');
     const kpiAvgEdge = document.getElementById('kpiAvgEdge');
+
+    // Puter.js AI Analysis Integration
+    runAiBtn.addEventListener('click', async () => {
+        if (!lastRenderedPicks || lastRenderedPicks.length === 0) {
+            alert("Please upload match data and ensure picks are qualified before running AI analysis.");
+            return;
+        }
+
+        aiOutput.style.display = 'block';
+        aiOutput.textContent = '⏳ Analyzing picks, comparing variance, and debating value... Please wait...';
+        runAiBtn.disabled = true;
+
+        const picksSummary = lastRenderedPicks.map((p, idx) => `
+${idx + 1}. Match: ${p.home} vs ${p.away} (${p.league})
+   - Pick: ${p.pick} [${p.market}]
+   - Model Prob: ${(p.prob * 100).toFixed(1)}% | Fair Odds: @${p.fairOdds.toFixed(2)} | Edge: ${(p.edge * 100).toFixed(1)}%
+   - Recommended Stake: ${(p.kellyFrac * 100).toFixed(2)}% | EV: ${(p.evPerUnit * 100).toFixed(1)}%
+`).join('\n');
+
+        const prompt = `You are an expert quantitative sports bettor and risk manager. Analyze the following list of active tennis value picks:
+
+${picksSummary}
+
+Tasks:
+1. Debate the top 2-3 strongest candidates based on EV, Model Probability, Edge, and Risk.
+2. Select ONE single "BEST BET" that offers the best balance between high probability and high mathematical edge.
+3. Provide a clear recommendation on where the user should focus their main bankroll stake. Keep the tone concise, analytical, and sharp.`;
+
+        try {
+            const response = await puter.ai.chat(prompt, { model: 'gpt-4o-mini' });
+            aiOutput.textContent = response.toString();
+        } catch (err) {
+            aiOutput.textContent = "⚠️ Error connecting to AI service: " + err.message;
+        } finally {
+            runAiBtn.disabled = false;
+        }
+    });
 
     function isBigName(home, away) {
         const text = (home + ' ' + away).toLowerCase();
@@ -380,7 +449,6 @@
         const workbook = XLSX.read(arrayBuffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[firstSheetName];
-        // raw rows as arrays so we can trim/normalize headers exactly like the old CSV parser did
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
         if (rows.length < 2) return [];
         const headers = rows[0].map(h => String(h).trim());
@@ -700,7 +768,6 @@
             function processMarketPick(marketKey, prob, pickDesc, marketLabel, o1Val, o2Val, isHome) {
                 if (isNaN(prob) || prob < minProb) return;
                 
-                // Market filter matching
                 if (market !== 'ALL') {
                     if (market.startsWith('aah_game_') && marketKey !== market) return;
                     if (market === 'aah_game' && !marketKey.startsWith('aah_game')) return;
@@ -743,26 +810,20 @@
                 });
             }
 
-            // 1) Match Winner (1x2)
             processMarketPick('1x2', parseFloat(getVal(row, ['1x2_h', 'prob_h'])), `${home} (Win)`, '1x2', getVal(row, ['odds_h', 'odds_1']), getVal(row, ['odds_a', 'odds_2']), true);
             processMarketPick('1x2', parseFloat(getVal(row, ['1x2_a', 'prob_a'])), `${away} (Win)`, '1x2', getVal(row, ['odds_h', 'odds_1']), getVal(row, ['odds_a', 'odds_2']), false);
 
-            // 2) Under 2.5 Sets
             processMarketPick('u_2.5', parseFloat(getVal(row, ['u_2.5', 'prob_u2.5'])), 'Under 2.5 Sets', 'u2.5', getVal(row, ['odds_u25', 'odds_u_2.5']), getVal(row, ['odds_o25', 'odds_o_2.5']), true);
 
-            // 3) Game Asian Handicaps (-1.5 Games & +1.5 Games)
             const ahOddsH = getVal(row, ['odds_h_ah', 'odds_ah_h', 'odds_h_ah_game']);
             const ahOddsA = getVal(row, ['odds_a_ah', 'odds_ah_a', 'odds_a_ah_game']);
 
-            // -1.5 Games
             processMarketPick('aah_game_-1.5', parseFloat(getVal(row, ['aah_game_-1.5_h', 'aah_-1.5_h', 'prob_h_ah_-1.5'])), `${home} -1.5 Games`, 'Game AH -1.5', ahOddsH, ahOddsA, true);
             processMarketPick('aah_game_-1.5', parseFloat(getVal(row, ['aah_game_-1.5_a', 'aah_-1.5_a', 'prob_a_ah_-1.5'])), `${away} -1.5 Games`, 'Game AH -1.5', ahOddsH, ahOddsA, false);
 
-            // +1.5 Games
             processMarketPick('aah_game_+1.5', parseFloat(getVal(row, ['aah_game_+1.5_h', 'aah_+1.5_h', 'prob_h_ah_+1.5'])), `${home} +1.5 Games`, 'Game AH +1.5', ahOddsH, ahOddsA, true);
             processMarketPick('aah_game_+1.5', parseFloat(getVal(row, ['aah_game_+1.5_a', 'aah_+1.5_a', 'prob_a_ah_+1.5'])), `${away} +1.5 Games`, 'Game AH +1.5', ahOddsH, ahOddsA, false);
 
-            // Generic Game AH Spread Line (if custom line like -2.5, +3.5 is present)
             const genericLineH = getVal(row, ['handicap_h', 'ah_line_h', 'game_line_h']) || '';
             const genericLineA = getVal(row, ['handicap_a', 'ah_line_a', 'game_line_a']) || '';
             processMarketPick('aah_game', parseFloat(getVal(row, ['aah_game_h', 'prob_h_ah_game'])), `${home} ${genericLineH} Games`, 'Game AH', ahOddsH, ahOddsA, true);
@@ -825,6 +886,7 @@
         if (!file) return;
         fileName.textContent = file.name;
         excludedMatchIds.clear();
+        aiOutput.style.display = 'none';
         const reader = new FileReader();
         reader.onload = function(ev) {
             parsedData = parseXLSX(ev.target.result);
